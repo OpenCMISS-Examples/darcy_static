@@ -19,29 +19,42 @@ perm_over_vis = 0.8
 initial_conc = 0.0
 screen_output_freq = 2 #how many time steps between outputs to screen
 
-(coordinateSystemUserNumber,
-    regionUserNumber,
-    basisUserNumber,
-    generatedMeshUserNumber,
-    meshUserNumber,
-    decompositionUserNumber,
-    geometricFieldUserNumber,
-    equationsSetFieldUserNumber,
-    dependentFieldUserNumber,
-    materialFieldUserNumber,
-    equationsSetUserNumber,
-    problemUserNumber) = range(1,13)
+(contextUserNumber,
+ coordinateSystemUserNumber,
+ regionUserNumber,
+ basisUserNumber,
+ generatedMeshUserNumber,
+ meshUserNumber,
+ decompositionUserNumber,
+ decomposerUserNumber,
+ geometricFieldUserNumber,
+ equationsSetFieldUserNumber,
+ dependentFieldUserNumber,
+ materialFieldUserNumber,
+ equationsSetUserNumber,
+ problemUserNumber) = range(1,15)
 
 numberGlobalXElements = 5
 numberGlobalYElements = 5
 numberGlobalZElements = 5
 
+context = iron.Context()
+context.Create(contextUserNumber)
+
+worldRegion = iron.Region()
+context.WorldRegionGet(worldRegion)
+
 #-----------------------------------------------------------------------------------------------------------
 # DIAGNOSTICS AND COMPUTATIONAL NODE INFORMATION
 #-----------------------------------------------------------------------------------------------------------
 
-numberOfComputationalNodes = iron.ComputationalNumberOfNodesGet()
-computationalNodeNumber = iron.ComputationalNodeNumberGet()
+computationEnvironment = iron.ComputationEnvironment()
+context.ComputationEnvironmentGet(computationEnvironment)
+
+worldWorkGroup = iron.WorkGroup()
+computationEnvironment.WorldWorkGroupGet(worldWorkGroup)
+numberOfComputationalNodes = worldWorkGroup.NumberOfGroupNodesGet()
+computationalNodeNumber = worldWorkGroup.GroupNodeNumberGet()
 
 #-----------------------------------------------------------------------------------------------------------
 #COORDINATE SYSTEM
@@ -49,7 +62,7 @@ computationalNodeNumber = iron.ComputationalNodeNumberGet()
 
 # Create a RC coordinate system
 coordinateSystem = iron.CoordinateSystem()
-coordinateSystem.CreateStart(coordinateSystemUserNumber)
+coordinateSystem.CreateStart(coordinateSystemUserNumber,context)
 coordinateSystem.dimension = 3
 coordinateSystem.CreateFinish()
 
@@ -59,7 +72,7 @@ coordinateSystem.CreateFinish()
 
 # Create a region
 region = iron.Region()
-region.CreateStart(regionUserNumber,iron.WorldRegion)
+region.CreateStart(regionUserNumber,worldRegion)
 region.label = "DarcyRegion"
 region.coordinateSystem = coordinateSystem
 region.CreateFinish()
@@ -70,7 +83,7 @@ region.CreateFinish()
 
 # Create a tri-linear lagrange basis
 basis = iron.Basis()
-basis.CreateStart(basisUserNumber)
+basis.CreateStart(basisUserNumber,context)
 basis.type = iron.BasisTypes.LAGRANGE_HERMITE_TP
 basis.numberOfXi = 3
 basis.interpolationXi = [iron.BasisInterpolationSpecifications.LINEAR_LAGRANGE]*3
@@ -103,9 +116,16 @@ print("number of elements: " + str(numberOfElements))
 # Create a decomposition for the mesh
 decomposition = iron.Decomposition()
 decomposition.CreateStart(decompositionUserNumber,mesh)
-decomposition.type = iron.DecompositionTypes.CALCULATED
-decomposition.numberOfDomains = numberOfComputationalNodes
 decomposition.CreateFinish()
+
+#-----------------------------------------------------------------------------------------------------------
+#DECOMPOSER
+#-----------------------------------------------------------------------------------------------------------
+
+decomposer = iron.Decomposer()
+decomposer.CreateStart(decomposerUserNumber,worldRegion,worldWorkGroup)
+decompositionIndex = decomposer.DecompositionAdd(decomposition)
+decomposer.CreateFinish()
 
 #-----------------------------------------------------------------------------------------------------------
 #GEOMETRIC FIELD
@@ -114,7 +134,7 @@ decomposition.CreateFinish()
 # Create a field for the geometry
 geometricField = iron.Field()
 geometricField.CreateStart(geometricFieldUserNumber,region)
-geometricField.meshDecomposition = decomposition
+geometricField.decomposition = decomposition
 geometricField.ComponentMeshComponentSet(iron.FieldVariableTypes.U,1,1)
 geometricField.ComponentMeshComponentSet(iron.FieldVariableTypes.U,2,1)
 geometricField.ComponentMeshComponentSet(iron.FieldVariableTypes.U,3,1)
@@ -189,7 +209,7 @@ problem = iron.Problem()
 problemSpecification = [iron.ProblemClasses.FLUID_MECHANICS,
         iron.ProblemTypes.DARCY_EQUATION,
         iron.ProblemSubtypes.STANDARD_DARCY]
-problem.CreateStart(problemUserNumber, problemSpecification)
+problem.CreateStart(problemUserNumber,context,problemSpecification)
 problem.CreateFinish()
 
 # Create control loops
@@ -235,8 +255,8 @@ firstNodeNumber=1
 nodes = iron.Nodes()
 region.NodesGet(nodes)
 lastNodeNumber = nodes.numberOfNodes
-firstNodeDomain = decomposition.NodeDomainGet(firstNodeNumber,1)
-lastNodeDomain = decomposition.NodeDomainGet(lastNodeNumber,1)
+firstNodeDomain = decomposition.NodeDomainGet(1,firstNodeNumber)
+lastNodeDomain = decomposition.NodeDomainGet(1,lastNodeNumber)
 
 for i in range(1,37):
     boundaryConditions.SetNode(dependentField,iron.FieldVariableTypes.U,1,1,i,3,iron.BoundaryConditionsTypes.FIXED,1.0)
@@ -313,4 +333,6 @@ fields.NodesExport("output/StaticDarcy","FORTRAN")
 fields.ElementsExport("output/StaticDarcy","FORTRAN")
 fields.Finalise()
 
-iron.Finalise()
+context.Destroy(context)
+
+Finalise()

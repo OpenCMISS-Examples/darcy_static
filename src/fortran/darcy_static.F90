@@ -1,492 +1,473 @@
-PROGRAM darcy_static
+PROGRAM DarcyStaticExample
 
   USE OpenCMISS
-  USE OpenCMISS_Iron
-
-#ifndef NOMPIMOD
-  USE MPI
-#endif
+ 
   IMPLICIT NONE
-#ifdef NOMPIMOD
-#include "mpif.h"
-#endif
 
   !-----------------------------------------------------------------------------------------------------------
   ! PROGRAM VARIABLES AND TYPES
   !-----------------------------------------------------------------------------------------------------------
 
   !Test program parameters
-  REAL(CMISSRP), PARAMETER :: HEIGHT=1.0_CMISSRP
-  REAL(CMISSRP), PARAMETER :: WIDTH=1.0_CMISSRP
-  REAL(CMISSRP), PARAMETER :: LENGTH=1.0_CMISSRP
+  REAL(OC_RP), PARAMETER :: HEIGHT=1.0_OC_RP
+  REAL(OC_RP), PARAMETER :: WIDTH=1.0_OC_RP
+  REAL(OC_RP), PARAMETER :: LENGTH=1.0_OC_RP
 
-  INTEGER(CMISSIntg), PARAMETER :: CoordinateSystemUserNumber=1
-  INTEGER(CMISSIntg), PARAMETER :: RegionUserNumber=2
-  INTEGER(CMISSIntg), PARAMETER :: MeshUserNumber=3
-  INTEGER(CMISSIntg), PARAMETER :: DecompositionUserNumber=4
-  INTEGER(CMISSIntg), PARAMETER :: GeometricFieldUserNumber=5
-  INTEGER(CMISSIntg), PARAMETER :: EquationsSetFieldUserNumber=6
-  INTEGER(CMISSIntg), PARAMETER :: DependentFieldUserNumberDarcy=7
-  INTEGER(CMISSIntg), PARAMETER :: MaterialsFieldUserNumberDarcy=8
-  INTEGER(CMISSIntg), PARAMETER :: AnalyticFieldUserNumberDarcy=9
-  INTEGER(CMISSIntg), PARAMETER :: EquationsSetUserNumberDarcy=10
-  INTEGER(CMISSIntg), PARAMETER :: ProblemUserNumber=11
-  INTEGER(CMISSIntg), PARAMETER :: GeneratedMeshUserNumber=12
-  INTEGER(CMISSIntg), PARAMETER :: DomainUserNumber=1
-  INTEGER(CMISSIntg), PARAMETER :: SolverDarcyUserNumber=1
-  INTEGER(CMISSIntg), PARAMETER :: MaterialsFieldUserNumberDarcyPorosity=1
-  INTEGER(CMISSIntg), PARAMETER :: MaterialsFieldUserNumberDarcyPermOverVis=2
+  INTEGER(OC_Intg), PARAMETER :: CONTEXT_USER_NUMBER=1
+  INTEGER(OC_Intg), PARAMETER :: COORDINATE_SYSTEM_USER_NUMBER=2
+  INTEGER(OC_Intg), PARAMETER :: REGION_USER_NUMBER=3
+  INTEGER(OC_Intg), PARAMETER :: BASIS_USER_NUMBER=4  
+  INTEGER(OC_Intg), PARAMETER :: GENERATED_MESH_USER_NUMBER=5
+  INTEGER(OC_Intg), PARAMETER :: MESH_USER_NUMBER=6
+  INTEGER(OC_Intg), PARAMETER :: DECOMPOSITION_USER_NUMBER=7
+  INTEGER(OC_Intg), PARAMETER :: DECOMPOSER_USER_NUMBER=8
+  INTEGER(OC_Intg), PARAMETER :: GEOMETRIC_FIELD_USER_NUMBER=9
+  INTEGER(OC_Intg), PARAMETER :: EQUATIONS_SET_FIELD_USER_NUMBER=10
+  INTEGER(OC_Intg), PARAMETER :: DEPENDENT_FIELD_USER_NUMBER=11
+  INTEGER(OC_Intg), PARAMETER :: MATERIALS_FIELD_USER_NUMBER=12
+  INTEGER(OC_Intg), PARAMETER :: ANALYTIC_FIELD_USER_NUMBER=13
+  INTEGER(OC_Intg), PARAMETER :: EQUATIONS_SET_USER_NUMBER=14
+  INTEGER(OC_Intg), PARAMETER :: PROBLEM_USER_NUMBER=15
 
   !Program variables
-  INTEGER(CMISSIntg) :: NUMBER_GLOBAL_X_ELEMENTS,NUMBER_GLOBAL_Y_ELEMENTS,NUMBER_GLOBAL_Z_ELEMENTS
-  INTEGER(CMISSIntg) :: NUMBER_OF_DIMENSIONS
-  INTEGER(CMISSIntg) :: BASIS_TYPE
-  INTEGER(CMISSIntg) :: BASIS_NUMBER_GEOMETRY
-  INTEGER(CMISSIntg) :: BASIS_NUMBER_VELOCITY
-  INTEGER(CMISSIntg) :: BASIS_NUMBER_PRESSURE
-  INTEGER(CMISSIntg) :: BASIS_XI_GAUSS_GEOMETRY
-  INTEGER(CMISSIntg) :: BASIS_XI_GAUSS_VELOCITY
-  INTEGER(CMISSIntg) :: BASIS_XI_GAUSS_PRESSURE
-  INTEGER(CMISSIntg) :: BASIS_XI_INTERPOLATION_GEOMETRY
-  INTEGER(CMISSIntg) :: BASIS_XI_INTERPOLATION_VELOCITY
-  INTEGER(CMISSIntg) :: BASIS_XI_INTERPOLATION_PRESSURE
-  INTEGER(CMISSIntg) :: MESH_NUMBER_OF_COMPONENTS
-  INTEGER(CMISSIntg) :: MESH_COMPONENT_NUMBER_GEOMETRY
-  INTEGER(CMISSIntg) :: MESH_COMPONENT_NUMBER_VELOCITY
-  INTEGER(CMISSIntg) :: MESH_COMPONENT_NUMBER_PRESSURE
-  INTEGER(CMISSIntg) :: NUMBER_OF_NODES_GEOMETRY
-  INTEGER(CMISSIntg) :: NUMBER_OF_NODES_VELOCITY
-  INTEGER(CMISSIntg) :: NUMBER_OF_NODES_PRESSURE
-  INTEGER(CMISSIntg) :: NUMBER_OF_ELEMENT_NODES_GEOMETRY
-  INTEGER(CMISSIntg) :: NUMBER_OF_ELEMENT_NODES_VELOCITY
-  INTEGER(CMISSIntg) :: NUMBER_OF_ELEMENT_NODES_PRESSURE
-  INTEGER(CMISSIntg) :: TOTAL_NUMBER_OF_NODES
-  INTEGER(CMISSIntg) :: TOTAL_NUMBER_OF_ELEMENTS
-  INTEGER(CMISSIntg) :: MAXIMUM_ITERATIONS
-  INTEGER(CMISSIntg) :: RESTART_VALUE
-  INTEGER(CMISSIntg) :: NUMBER_OF_FIXED_WALL_NODES
-  INTEGER(CMISSIntg) :: NUMBER_OF_INLET_WALL_NODES
-  INTEGER(CMISSIntg) :: EQUATIONS_DARCY_OUTPUT
-  INTEGER(CMISSIntg) :: COMPONENT_NUMBER
-  INTEGER(CMISSIntg) :: NODE_NUMBER
-  INTEGER(CMISSIntg) :: ELEMENT_NUMBER
-  INTEGER(CMISSIntg) :: NODE_COUNTER
-  INTEGER(CMISSIntg) :: CONDITION
-  INTEGER(CMISSIntg) :: LINEAR_SOLVER_DARCY_OUTPUT_TYPE
-  INTEGER(CMISSIntg) :: ANALYTICAL_TYPE
-  INTEGER, ALLOCATABLE, DIMENSION(:):: FIXED_WALL_NODES
-  INTEGER, ALLOCATABLE, DIMENSION(:):: INLET_WALL_NODES
-  REAL(CMISSRP) :: INITIAL_FIELD(3)
-  REAL(CMISSRP) :: BOUNDARY_CONDITIONS(3)
-  REAL(CMISSRP) :: DIVERGENCE_TOLERANCE
-  REAL(CMISSRP) :: RELATIVE_TOLERANCE
-  REAL(CMISSRP) :: ABSOLUTE_TOLERANCE
-  REAL(CMISSRP) :: LINESEARCH_ALPHA
-  REAL(CMISSRP) :: VALUE
-  REAL(CMISSRP) :: POROSITY_PARAM,PERM_OVER_VIS_PARAM
-  LOGICAL :: EXPORT_FIELD_IO
-  LOGICAL :: LINEAR_SOLVER_DARCY_DIRECT_FLAG
-  LOGICAL :: FIXED_WALL_NODES_FLAG
-  LOGICAL :: INLET_WALL_NODES_FLAG
+  INTEGER(OC_Intg) :: numberOfGlobalXElements,numberOfGlobalYElements,numberOfGlobalZElements
+  INTEGER(OC_Intg) :: numberOfDimensions
+  INTEGER(OC_Intg) :: basisType
+  INTEGER(OC_Intg) :: numberOfGaussXi
+  INTEGER(OC_Intg) :: basisXiInterpolation
+  INTEGER(OC_Intg) :: maximumIterations
+  INTEGER(OC_Intg) :: restartValue
+  INTEGER(OC_Intg) :: numberOfFixedWallNodes
+  INTEGER(OC_Intg) :: numberOfInletWallNodes
+  INTEGER(OC_Intg) :: equationsDarcyOutput
+  INTEGER(OC_Intg) :: componentIdx
+  INTEGER(OC_Intg) :: nodeNumber
+  INTEGER(OC_Intg) :: nodeIdx
+  INTEGER(OC_Intg) :: condition
+  INTEGER(OC_Intg) :: linearSolverDarcyOutputType
+  INTEGER(OC_Intg) :: analyticalType
+  INTEGER, ALLOCATABLE :: fixedWallNodes(:)
+  INTEGER, ALLOCATABLE :: inletWallNodes(:)
+  REAL(OC_RP) :: initialFieldValue(3)
+  REAL(OC_RP) :: boundaryConditionValues(3)
+  REAL(OC_RP) :: divergenceTolerance
+  REAL(OC_RP) :: relativeTolerance
+  REAL(OC_RP) :: absoluteTolerance
+  REAL(OC_RP) :: linesearchAlpha
+  REAL(OC_RP) :: boundaryConditionValue
+  REAL(OC_RP) :: porosityParameter,permOverVisParameter
+  LOGICAL :: directoryExists
+  LOGICAL :: exportFieldIO
+  LOGICAL :: linearSolverDarcyDirectFlag
+  LOGICAL :: fixedWallNodesFlag
+  LOGICAL :: inletWallNodesFlag
 
   !CMISS variables
-  TYPE(cmfe_RegionType) :: Region
-  TYPE(cmfe_RegionType) :: WorldRegion
-  TYPE(cmfe_CoordinateSystemType) :: CoordinateSystem
-  TYPE(cmfe_CoordinateSystemType) :: WorldCoordinateSystem
-  TYPE(cmfe_BasisType) :: BasisGeometry
-  TYPE(cmfe_BasisType) :: BasisVelocity
-  TYPE(cmfe_BasisType) :: BasisPressure
-  TYPE(cmfe_NodesType) :: Nodes
-  TYPE(cmfe_MeshElementsType) :: MeshElementsGeometry
-  TYPE(cmfe_MeshElementsType) :: MeshElementsVelocity
-  TYPE(cmfe_MeshElementsType) :: MeshElementsPressure
-  TYPE(cmfe_MeshType) :: Mesh
-  TYPE(cmfe_DecompositionType) :: Decomposition
-  TYPE(cmfe_FieldsType) :: Fields
-  TYPE(cmfe_FieldType) :: GeometricField,AnalyticField
-  TYPE(cmfe_FieldType) :: EquationsSetField
-  TYPE(cmfe_FieldType) :: DependentFieldDarcy
-  TYPE(cmfe_FieldType) :: MaterialsFieldDarcy
-  TYPE(cmfe_GeneratedMeshType) :: GeneratedMesh
-  TYPE(cmfe_BoundaryConditionsType) :: BoundaryConditionsDarcy
-  TYPE(cmfe_EquationsSetType) :: EquationsSetDarcy
-  TYPE(cmfe_EquationsType) :: EquationsDarcy
-  TYPE(cmfe_ProblemType) :: Problem
-  TYPE(cmfe_ControlLoopType) :: ControlLoop
-  TYPE(cmfe_SolverType) :: LinearSolverDarcy
-  TYPE(cmfe_SolverEquationsType) :: SolverEquationsDarcy
+  TYPE(OC_BasisType) :: basis
+  TYPE(OC_BoundaryConditionsType) :: boundaryConditionsDarcy
+  TYPE(OC_ComputationEnvironmentType) :: computationEnvironment
+  TYPE(OC_ContextType) :: context
+  TYPE(OC_ControlLoopType) :: controlLoop
+  TYPE(OC_CoordinateSystemType) :: coordinateSystem
+  TYPE(OC_DecomposerType) :: decomposer
+  TYPE(OC_DecompositionType) :: decomposition
+  TYPE(OC_EquationsType) :: equationsDarcy
+  TYPE(OC_EquationsSetType) :: equationsSetDarcy
+  TYPE(OC_FieldType) :: geometricField,analyticField
+  TYPE(OC_FieldType) :: equationsSetField
+  TYPE(OC_FieldType) :: dependentFieldDarcy
+  TYPE(OC_FieldType) :: materialsFieldDarcy
+  TYPE(OC_FieldsType) :: fields
+  TYPE(OC_GeneratedMeshType) :: generatedMesh
+  TYPE(OC_MeshType) :: mesh
+  TYPE(OC_ProblemType) :: problem
+  TYPE(OC_SolverType) :: linearSolverDarcy
+  TYPE(OC_SolverEquationsType) :: solverEquationsDarcy
+  TYPE(OC_RegionType) :: region
+  TYPE(OC_RegionType) :: WorldRegion
+  TYPE(OC_WorkGroupType) :: worldWorkGroup
 
   !Generic CMISS variables
-  INTEGER(CMISSIntg) :: NumberOfComputationalNodes,ComputationalNodeNumber,NodeDomain
-  INTEGER(CMISSIntg) :: EquationsSetIndex,i,BoundaryNodeDomain,Err
+  INTEGER(OC_Intg) :: numberOfComputationalNodes,computationalNodeNumber
+  INTEGER(OC_Intg) :: decompositionIndex,equationsSetIndex,boundaryNodeDomain,err
 
   !Intialise OpenCMISS
-  CALL cmfe_Initialise(WorldCoordinateSystem,WorldRegion,Err)
-  CALL cmfe_ErrorHandlingModeSet(CMFE_ERRORS_TRAP_ERROR,Err)
-
+  CALL OC_Initialise(err)
+  CALL OC_ErrorHandlingModeSet(OC_ERRORS_TRAP_ERROR,err)
+  !Create a context
+  CALL OC_Context_Initialise(context,err)
+  CALL OC_Context_Create(CONTEXT_USER_NUMBER,context,err)
+  CALL OC_Region_Initialise(worldRegion,err)
+  CALL OC_Context_WorldRegionGet(context,worldRegion,err)
+ 
   !Get the computational nodes information
-  CALL cmfe_ComputationalNumberOfNodesGet(NumberOfComputationalNodes,Err)
-  CALL cmfe_ComputationalNodeNumberGet(ComputationalNodeNumber,Err)
+  CALL OC_ComputationEnvironment_Initialise(computationEnvironment,err)
+  CALL OC_Context_ComputationEnvironmentGet(context,computationEnvironment,err)
+  
+  CALL OC_WorkGroup_Initialise(worldWorkGroup,err)
+  CALL OC_ComputationEnvironment_WorldWorkGroupGet(computationEnvironment,worldWorkGroup,err)
+  CALL OC_WorkGroup_NumberOfGroupNodesGet(worldWorkGroup,numberOfComputationalNodes,err)
+  CALL OC_WorkGroup_GroupNodeNumberGet(worldWorkGroup,computationalNodeNumber,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! PROBLEM CONTROL PANEL
   !-----------------------------------------------------------------------------------------------------------
 
-  NUMBER_GLOBAL_X_ELEMENTS=3
-  NUMBER_GLOBAL_Y_ELEMENTS=3
-  NUMBER_GLOBAL_Z_ELEMENTS=3
-  NUMBER_OF_DIMENSIONS=3
-  MESH_COMPONENT_NUMBER_GEOMETRY=1
-  MESH_COMPONENT_NUMBER_VELOCITY=1
-  MESH_COMPONENT_NUMBER_PRESSURE=1
-  BASIS_TYPE=CMFE_BASIS_LINEAR_LAGRANGE_INTERPOLATION
-  BASIS_XI_INTERPOLATION_GEOMETRY=CMFE_BASIS_LINEAR_LAGRANGE_INTERPOLATION
-  BASIS_XI_INTERPOLATION_VELOCITY=CMFE_BASIS_LINEAR_LAGRANGE_INTERPOLATION
-  BASIS_XI_INTERPOLATION_PRESSURE=CMFE_BASIS_LINEAR_LAGRANGE_INTERPOLATION
+  numberOfGlobalXElements=3
+  numberOfGlobalYElements=3
+  numberOfGlobalZElements=3
+  numberOfDimensions=3
+  basisType=OC_BASIS_LINEAR_LAGRANGE_INTERPOLATION
+  basisXiInterpolation=OC_BASIS_LINEAR_LAGRANGE_INTERPOLATION
   !Set initial values
-  INITIAL_FIELD(1)=0.0_CMISSRP
-  INITIAL_FIELD(2)=0.0_CMISSRP
-  INITIAL_FIELD(3)=0.0_CMISSRP
+  initialFieldValue(1)=0.0_OC_RP
+  initialFieldValue(2)=0.0_OC_RP
+  initialFieldValue(3)=0.0_OC_RP
   !Set boundary conditions
-  FIXED_WALL_NODES_FLAG=.TRUE.
-  INLET_WALL_NODES_FLAG=.TRUE.
-  IF(FIXED_WALL_NODES_FLAG) THEN
-     NUMBER_OF_FIXED_WALL_NODES=48
-     ALLOCATE(FIXED_WALL_NODES(NUMBER_OF_FIXED_WALL_NODES))
-     FIXED_WALL_NODES=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,17,20,21,24,25, &
-        & 28,29,32,33,36,37,40,41,44,45,48]
+  fixedWallNodesFlag=.TRUE.
+  inletWallNodesFlag=.TRUE.
+  IF(fixedWallNodesFlag) THEN
+    numberOfFixedWallNodes=48
+    ALLOCATE(fixedWallNodes(numberOfFixedWallNodes))
+    fixedWallNodes=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,17,20,21,24,25, &
+      & 28,29,32,33,36,37,40,41,44,45,48]
   ENDIF
-  IF(INLET_WALL_NODES_FLAG) THEN
-     NUMBER_OF_INLET_WALL_NODES=4
-     ALLOCATE(INLET_WALL_NODES(NUMBER_OF_INLET_WALL_NODES))
-     INLET_WALL_NODES=[18,19,34,35]
-     !Set initial boundary conditions
-     BOUNDARY_CONDITIONS(1)=0.0_CMISSRP
-     BOUNDARY_CONDITIONS(2)=1.0_CMISSRP
-     BOUNDARY_CONDITIONS(3)=0.0_CMISSRP
+  IF(inletWallNodesFlag) THEN
+    numberOfInletWallNodes=4
+    ALLOCATE(inletWallNodes(numberOfInletWallNodes))
+    inletWallNodes=[18,19,34,35]
+    !Set initial boundary conditions
+    boundaryConditionValues(1)=0.0_OC_RP
+    boundaryConditionValues(2)=1.0_OC_RP
+    boundaryConditionValues(3)=0.0_OC_RP
   ENDIF
   !Set material parameters
-  POROSITY_PARAM=0.5_CMISSRP
-  PERM_OVER_VIS_PARAM=0.8_CMISSRP
+  porosityParameter=0.5_OC_RP
+  permOverVisParameter=0.8_OC_RP
   !Set number of Gauss points
-  BASIS_XI_GAUSS_GEOMETRY=3
-  BASIS_XI_GAUSS_VELOCITY=3
-  BASIS_XI_GAUSS_PRESSURE=3
+  numberOfGaussXi=3
   !Set output parameter
   !(NoOutput/ProgressOutput/TimingOutput/SolverOutput/SolverMatrixOutput)
-  LINEAR_SOLVER_DARCY_OUTPUT_TYPE=CMFE_SOLVER_NO_OUTPUT
+  linearSolverDarcyOutputType=OC_SOLVER_NO_OUTPUT
   !(NoOutput/TimingOutput/MatrixOutput/ElementOutput)
-  EQUATIONS_DARCY_OUTPUT=CMFE_EQUATIONS_NO_OUTPUT
+  equationsDarcyOutput=OC_EQUATIONS_NO_OUTPUT
   !Set solver parameters
-  LINEAR_SOLVER_DARCY_DIRECT_FLAG=.FALSE.
-  RELATIVE_TOLERANCE=1.0E-10_CMISSRP !default: 1.0E-05_CMISSRP
-  ABSOLUTE_TOLERANCE=1.0E-10_CMISSRP !default: 1.0E-10_CMISSRP
-  DIVERGENCE_TOLERANCE=1.0E5_CMISSRP !default: 1.0E5
-  MAXIMUM_ITERATIONS=10000_CMISSIntg !default: 100000
-  RESTART_VALUE=3000_CMISSIntg !default: 30
-  LINESEARCH_ALPHA=1.0_CMISSRP
+  linearSolverDarcyDirectFlag=.FALSE.
+  relativeTolerance=1.0E-10_OC_RP !default: 1.0E-05_OC_RP
+  absoluteTolerance=1.0E-10_OC_RP !default: 1.0E-10_OC_RP
+  divergenceTolerance=1.0E5_OC_RP !default: 1.0E5
+  maximumIterations=10000_OC_Intg !default: 100000
+  restartValue=3000_OC_Intg !default: 30
+  linesearchAlpha=1.0_OC_RP
 
-  !IF(NUMBER_OF_DIMENSIONS==2) ANALYTICAL_TYPE=CMFE_EQUATIONS_SET_DARCY_EQUATION_TWO_DIM_2
-  IF(NUMBER_OF_DIMENSIONS==2) ANALYTICAL_TYPE=CMFE_EQUATIONS_SET_DARCY_EQUATION_TWO_DIM_3
-  !IF(NUMBER_OF_DIMENSIONS==3) ANALYTICAL_TYPE=CMFE_EQUATIONS_SET_DARCY_EQUATION_THREE_DIM_2
-  IF(NUMBER_OF_DIMENSIONS==3) ANALYTICAL_TYPE=CMFE_EQUATIONS_SET_DARCY_EQUATION_THREE_DIM_3
+  !IF(numberOfDimensions==2) analyticalType=OC_EQUATIONS_SET_DARCY_EQUATION_TWO_DIM_2
+  IF(numberOfDimensions==2) analyticalType=OC_EQUATIONS_SET_DARCY_EQUATION_TWO_DIM_3
+  !IF(numberOfDimensions==3) analyticalType=OC_EQUATIONS_SET_DARCY_EQUATION_THREE_DIM_2
+  IF(numberOfDimensions==3) analyticalType=OC_EQUATIONS_SET_DARCY_EQUATION_THREE_DIM_3
 
   !-----------------------------------------------------------------------------------------------------------
   ! COORDINATE SYSTEM
   !-----------------------------------------------------------------------------------------------------------
 
   !Start the creation of a new RC coordinate system
-  CALL cmfe_CoordinateSystem_Initialise(CoordinateSystem,Err)
-  CALL cmfe_CoordinateSystem_CreateStart(CoordinateSystemUserNumber,CoordinateSystem,Err)
+  CALL OC_CoordinateSystem_Initialise(coordinateSystem,err)
+  CALL OC_CoordinateSystem_CreateStart(COORDINATE_SYSTEM_USER_NUMBER,context,coordinateSystem,err)
   !Set the coordinate system dimension
-  CALL cmfe_CoordinateSystem_DimensionSet(CoordinateSystem,NUMBER_OF_DIMENSIONS,Err)
+  CALL OC_CoordinateSystem_DimensionSet(coordinateSystem,numberOfDimensions,err)
   !Finish the creation of the coordinate system
-  CALL cmfe_CoordinateSystem_CreateFinish(CoordinateSystem,Err)
+  CALL OC_CoordinateSystem_CreateFinish(coordinateSystem,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! REGION
   !-----------------------------------------------------------------------------------------------------------
 
   !Start the creation of a new region
-  CALL cmfe_Region_Initialise(Region,Err)
-  CALL cmfe_Region_CreateStart(RegionUserNumber,WorldRegion,Region,Err)
-  CALL cmfe_Region_LabelSet(Region,"DarcyRegion",Err)
+  CALL OC_Region_Initialise(region,err)
+  CALL OC_Region_CreateStart(REGION_USER_NUMBER,worldRegion,region,err)
+  CALL OC_Region_LabelSet(region,"DarcyRegion",err)
   !Set the regions coordinate system as defined above
-  CALL cmfe_Region_CoordinateSystemSet(Region,CoordinateSystem,Err)
+  CALL OC_Region_CoordinateSystemSet(region,coordinateSystem,err)
   !Finish the creation of the region
-  CALL cmfe_Region_CreateFinish(Region,Err)
+  CALL OC_Region_CreateFinish(region,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! BASIS
   !-----------------------------------------------------------------------------------------------------------
 
   !Start the creation of new bases
-  MESH_NUMBER_OF_COMPONENTS=1
-  CALL cmfe_Basis_Initialise(BasisGeometry,Err)
-  CALL cmfe_Basis_CreateStart(BASIS_NUMBER_GEOMETRY,BasisGeometry,Err)
+  CALL OC_Basis_Initialise(basis,err)
+  CALL OC_Basis_CreateStart(BASIS_USER_NUMBER,context,basis,err)
   !Set the basis type (Lagrange/Simplex)
-  CALL cmfe_Basis_TypeSet(BasisGeometry,BASIS_TYPE,Err)
+  CALL OC_Basis_TypeSet(basis,basisType,err)
   !Set the basis xi number
-  CALL cmfe_Basis_NumberOfXiSet(BasisGeometry,NUMBER_OF_DIMENSIONS,Err)
+  CALL OC_Basis_NumberOfXiSet(basis,numberOfDimensions,err)
   !Set the basis xi interpolation and number of Gauss points
-  IF(NUMBER_OF_DIMENSIONS==2) THEN
-     CALL cmfe_Basis_InterpolationXiSet(BasisGeometry,[BASIS_XI_INTERPOLATION_GEOMETRY,BASIS_XI_INTERPOLATION_GEOMETRY],Err)
-     CALL cmfe_Basis_QuadratureNumberOfGaussXiSet(BasisGeometry,[BASIS_XI_GAUSS_GEOMETRY,BASIS_XI_GAUSS_GEOMETRY],Err)
+  IF(numberOfDimensions==2) THEN
+    CALL OC_Basis_InterpolationXiSet(basis,[basisXiInterpolation,basisXiInterpolation],err)
+    CALL OC_Basis_QuadratureNumberOfGaussXiSet(basis,[numberOfGaussXi,numberOfGaussXi],err)
   ELSE
-     CALL cmfe_Basis_InterpolationXiSet(BasisGeometry,[BASIS_XI_INTERPOLATION_GEOMETRY,BASIS_XI_INTERPOLATION_GEOMETRY, &
-          & BASIS_XI_INTERPOLATION_GEOMETRY],Err)
-     CALL cmfe_Basis_QuadratureNumberOfGaussXiSet(BasisGeometry,[BASIS_XI_GAUSS_GEOMETRY,BASIS_XI_GAUSS_GEOMETRY, &
-          & BASIS_XI_GAUSS_GEOMETRY],Err)
-     CALL cmfe_Basis_QuadratureLocalFaceGaussEvaluateSet(BasisGeometry,.TRUE.,Err)
+    CALL OC_Basis_InterpolationXiSet(basis,[basisXiInterpolation,basisXiInterpolation,basisXiInterpolation],err)
+    CALL OC_Basis_QuadratureNumberOfGaussXiSet(basis,[numberOfGaussXi,numberOfGaussXi,numberOfGaussXi],err)
+    CALL OC_Basis_QuadratureLocalFaceGaussEvaluateSet(basis,.TRUE.,err)
   ENDIF
   !Finish the creation of the basis
-  CALL cmfe_Basis_CreateFinish(BasisGeometry,Err)
+  CALL OC_Basis_CreateFinish(basis,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! MESH
   !-----------------------------------------------------------------------------------------------------------
 
   !Start the creation of a generated mesh in the region
-  CALL cmfe_GeneratedMesh_Initialise(GeneratedMesh,Err)
-  CALL cmfe_GeneratedMesh_CreateStart(GeneratedMeshUserNumber,Region,GeneratedMesh,Err)
+  CALL OC_GeneratedMesh_Initialise(generatedMesh,err)
+  CALL OC_GeneratedMesh_CreateStart(GENERATED_MESH_USER_NUMBER,region,generatedMesh,err)
   !Set up a regular x*y*z mesh
-  CALL cmfe_GeneratedMesh_TypeSet(GeneratedMesh,CMFE_GENERATED_MESH_REGULAR_MESH_TYPE,Err)
+  CALL OC_GeneratedMesh_TypeSet(generatedMesh,OC_GENERATED_MESH_REGULAR_MESH_TYPE,err)
   !Set the default basis
-  CALL cmfe_GeneratedMesh_BasisSet(GeneratedMesh,[BasisGeometry],Err)
+  CALL OC_GeneratedMesh_BasisSet(generatedMesh,[basis],err)
   !Define the mesh on the region
-  IF(NUMBER_OF_DIMENSIONS==2) THEN
-     CALL cmfe_GeneratedMesh_ExtentSet(GeneratedMesh,[WIDTH,HEIGHT],Err)
-     CALL cmfe_GeneratedMesh_NumberOfElementsSet(GeneratedMesh,[NUMBER_GLOBAL_X_ELEMENTS,NUMBER_GLOBAL_Y_ELEMENTS],Err)
+  IF(numberOfDimensions==2) THEN
+     CALL OC_GeneratedMesh_ExtentSet(generatedMesh,[WIDTH,HEIGHT],err)
+     CALL OC_GeneratedMesh_NumberOfElementsSet(generatedMesh,[numberOfGlobalXElements,numberOfGlobalYElements],err)
   ELSE
-     CALL cmfe_GeneratedMesh_ExtentSet(GeneratedMesh,[WIDTH,HEIGHT,LENGTH],Err)
-     CALL cmfe_GeneratedMesh_NumberOfElementsSet(GeneratedMesh,[NUMBER_GLOBAL_X_ELEMENTS,NUMBER_GLOBAL_Y_ELEMENTS, &
-          & NUMBER_GLOBAL_Z_ELEMENTS],Err)
+     CALL OC_GeneratedMesh_ExtentSet(generatedMesh,[WIDTH,HEIGHT,LENGTH],err)
+     CALL OC_GeneratedMesh_NumberOfElementsSet(generatedMesh,[numberOfGlobalXElements,numberOfGlobalYElements, &
+       & numberOfGlobalZElements],err)
   ENDIF
   !Finish the creation of a generated mesh in the region
-  CALL cmfe_Mesh_Initialise(Mesh,Err)
-  CALL cmfe_GeneratedMesh_CreateFinish(GeneratedMesh,MeshUserNumber,Mesh,Err)
+  CALL OC_Mesh_Initialise(mesh,err)
+  CALL OC_GeneratedMesh_CreateFinish(generatedMesh,MESH_USER_NUMBER,mesh,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! MESH DECOMPOSITION
   !-----------------------------------------------------------------------------------------------------------
 
   !Create a decomposition
-  CALL cmfe_Decomposition_Initialise(Decomposition,Err)
-  CALL cmfe_Decomposition_CreateStart(DecompositionUserNumber,Mesh,Decomposition,Err)
-  !Set the decomposition to be a general decomposition with the specified number of domains
-  CALL cmfe_Decomposition_TypeSet(Decomposition,CMFE_DECOMPOSITION_CALCULATED_TYPE,Err)
-  CALL cmfe_Decomposition_NumberOfDomainsSet(Decomposition,NumberOfComputationalNodes,Err)
+  CALL OC_Decomposition_Initialise(decomposition,err)
+  CALL OC_Decomposition_CreateStart(DECOMPOSITION_USER_NUMBER,mesh,decomposition,err)
   !Finish the decomposition
-  CALL cmfe_Decomposition_CreateFinish(Decomposition,Err)
+  CALL OC_Decomposition_CreateFinish(decomposition,err)
 
+  !-----------------------------------------------------------------------------------------------------------
+  ! DECOMPOSER
+  !-----------------------------------------------------------------------------------------------------------
+
+  CALL OC_Decomposer_Initialise(decomposer,err)
+  CALL OC_Decomposer_CreateStart(DECOMPOSER_USER_NUMBER,region,worldWorkGroup,decomposer,err)
+  !Add in the decomposition
+  CALL OC_Decomposer_DecompositionAdd(decomposer,decomposition,decompositionIndex,err)
+  !Finish the decomposer
+  CALL OC_Decomposer_CreateFinish(decomposer,err)
+  
   !-----------------------------------------------------------------------------------------------------------
   ! GEOMETRIC FIELD
   !-----------------------------------------------------------------------------------------------------------
 
   !Start to create a default (geometric) field on the region
-  CALL cmfe_Field_Initialise(GeometricField,Err)
-  CALL cmfe_Field_CreateStart(GeometricFieldUserNumber,Region,GeometricField,Err)
+  CALL OC_Field_Initialise(geometricField,err)
+  CALL OC_Field_CreateStart(GEOMETRIC_FIELD_USER_NUMBER,region,geometricField,err)
   !Set the field type
-  CALL cmfe_Field_TypeSet(GeometricField,CMFE_FIELD_GEOMETRIC_TYPE,Err)
+  CALL OC_Field_TypeSet(geometricField,OC_FIELD_GEOMETRIC_TYPE,err)
   !Set the decomposition to use
-  CALL cmfe_Field_MeshDecompositionSet(GeometricField,Decomposition,Err)
+  CALL OC_Field_DecompositionSet(geometricField,decomposition,err)
   !Set the scaling to use
-  CALL cmfe_Field_ScalingTypeSet(GeometricField,CMFE_FIELD_NO_SCALING,Err)
+  CALL OC_Field_ScalingTypeSet(geometricField,OC_FIELD_NO_SCALING,err)
   !Set the mesh component to be used by the field components.
-  DO COMPONENT_NUMBER=1,NUMBER_OF_DIMENSIONS
-     CALL cmfe_Field_ComponentMeshComponentSet(GeometricField,CMFE_FIELD_U_VARIABLE_TYPE,COMPONENT_NUMBER, &
-          & MESH_COMPONENT_NUMBER_GEOMETRY,Err)
+  DO componentIdx=1,numberOfDimensions
+     CALL OC_Field_ComponentMeshComponentSet(geometricField,OC_FIELD_U_VARIABLE_TYPE,componentIdx, &
+       & 1,err)
   ENDDO
   !Finish creating the field
-  CALL cmfe_Field_CreateFinish(GeometricField,Err)
+  CALL OC_Field_CreateFinish(geometricField,err)
   !Update the geometric field parameters
-  CALL cmfe_GeneratedMesh_GeometricParametersCalculate(GeneratedMesh,GeometricField,Err)
+  CALL OC_GeneratedMesh_GeometricParametersCalculate(generatedMesh,geometricField,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! EQUATIONS SETS
   !-----------------------------------------------------------------------------------------------------------
 
   !Create the equations set for Static Darcy
-  CALL cmfe_EquationsSet_Initialise(EquationsSetDarcy,Err)
-  CALL cmfe_Field_Initialise(EquationsSetField,Err)
-  CALL cmfe_EquationsSet_CreateStart(EquationsSetUserNumberDarcy,Region,GeometricField,[CMFE_EQUATIONS_SET_FLUID_MECHANICS_CLASS, &
-       & CMFE_EQUATIONS_SET_DARCY_EQUATION_TYPE,CMFE_EQUATIONS_SET_STANDARD_DARCY_SUBTYPE],EquationsSetFieldUserNumber, &
-       & EquationsSetField,EquationsSetDarcy,Err)
+  CALL OC_EquationsSet_Initialise(equationsSetDarcy,err)
+  CALL OC_Field_Initialise(equationsSetField,err)
+  CALL OC_EquationsSet_CreateStart(EQUATIONS_SET_USER_NUMBER,region,geometricField,[OC_EQUATIONS_SET_FLUID_MECHANICS_CLASS, &
+    & OC_EQUATIONS_SET_DARCY_EQUATION_TYPE,OC_EQUATIONS_SET_STANDARD_DARCY_SUBTYPE],EQUATIONS_SET_FIELD_USER_NUMBER, &
+    & equationsSetField,equationsSetDarcy,err)
   !Finish creating the equations set
-  CALL cmfe_EquationsSet_CreateFinish(EquationsSetDarcy,Err)
+  CALL OC_EquationsSet_CreateFinish(equationsSetDarcy,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! DEPENDENT FIELD
   !-----------------------------------------------------------------------------------------------------------
 
   !Create the equations set dependent field variables for Static Darcy
-  CALL cmfe_Field_Initialise(DependentFieldDarcy,Err)
-  CALL cmfe_EquationsSet_DependentCreateStart(EquationsSetDarcy,DependentFieldUserNumberDarcy,DependentFieldDarcy,Err)
+  CALL OC_Field_Initialise(dependentFieldDarcy,err)
+  CALL OC_EquationsSet_DependentCreateStart(equationsSetDarcy,DEPENDENT_FIELD_USER_NUMBER,dependentFieldDarcy,err)
   !Set the mesh component to be used by the field components.
-  DO COMPONENT_NUMBER=1,NUMBER_OF_DIMENSIONS
-     CALL cmfe_Field_ComponentMeshComponentSet(DependentFieldDarcy,CMFE_FIELD_U_VARIABLE_TYPE,COMPONENT_NUMBER,1,Err)
-     CALL cmfe_Field_ComponentMeshComponentSet(DependentFieldDarcy,CMFE_FIELD_DELUDELN_VARIABLE_TYPE,COMPONENT_NUMBER,1,Err)
+  DO componentIdx=1,numberOfDimensions
+    CALL OC_Field_ComponentMeshComponentSet(dependentFieldDarcy,OC_FIELD_U_VARIABLE_TYPE,componentIdx,1,err)
+    CALL OC_Field_ComponentMeshComponentSet(dependentFieldDarcy,OC_FIELD_DELUDELN_VARIABLE_TYPE,componentIdx,1,err)
   ENDDO
-  COMPONENT_NUMBER=NUMBER_OF_DIMENSIONS+1
-  CALL cmfe_Field_ComponentMeshComponentSet(DependentFieldDarcy,CMFE_FIELD_U_VARIABLE_TYPE,COMPONENT_NUMBER,1,Err)
-  CALL cmfe_Field_ComponentMeshComponentSet(DependentFieldDarcy,CMFE_FIELD_DELUDELN_VARIABLE_TYPE,COMPONENT_NUMBER,1,Err)
+  componentIdx=numberOfDimensions+1
+  CALL OC_Field_ComponentMeshComponentSet(dependentFieldDarcy,OC_FIELD_U_VARIABLE_TYPE,componentIdx,1,err)
+  CALL OC_Field_ComponentMeshComponentSet(dependentFieldDarcy,OC_FIELD_DELUDELN_VARIABLE_TYPE,componentIdx,1,err)
   !Finish the equations set dependent field variables
-  CALL cmfe_EquationsSet_DependentCreateFinish(EquationsSetDarcy,Err)
+  CALL OC_EquationsSet_DependentCreateFinish(equationsSetDarcy,err)
 
   !Initialise dependent field (velocity components)
-  DO COMPONENT_NUMBER=1,NUMBER_OF_DIMENSIONS
-     CALL cmfe_Field_ComponentValuesInitialise(DependentFieldDarcy,CMFE_FIELD_U_VARIABLE_TYPE,CMFE_FIELD_VALUES_SET_TYPE, &
-          & COMPONENT_NUMBER,INITIAL_FIELD(COMPONENT_NUMBER),Err)
+  DO componentIdx=1,numberOfDimensions
+    CALL OC_Field_ComponentValuesInitialise(dependentFieldDarcy,OC_FIELD_U_VARIABLE_TYPE,OC_FIELD_VALUES_SET_TYPE, &
+      & componentIdx,initialFieldValue(componentIdx),err)
   ENDDO
-
+  
   !-----------------------------------------------------------------------------------------------------------
   ! MATERIALS FIELD
   !-----------------------------------------------------------------------------------------------------------
 
   !Create the equations set materials field variables for Static Darcy
-  CALL cmfe_Field_Initialise(MaterialsFieldDarcy,Err)
-  CALL cmfe_EquationsSet_MaterialsCreateStart(EquationsSetDarcy,MaterialsFieldUserNumberDarcy,MaterialsFieldDarcy,Err)
+  CALL OC_Field_Initialise(materialsFieldDarcy,err)
+  CALL OC_EquationsSet_MaterialsCreateStart(equationsSetDarcy,MATERIALS_FIELD_USER_NUMBER,materialsFieldDarcy,err)
   !Finish the equations set materials field variables
-  CALL cmfe_EquationsSet_MaterialsCreateFinish(EquationsSetDarcy,Err)
-  CALL cmfe_Field_ComponentValuesInitialise(MaterialsFieldDarcy,CMFE_FIELD_U_VARIABLE_TYPE,CMFE_FIELD_VALUES_SET_TYPE, &
-       & MaterialsFieldUserNumberDarcyPorosity,POROSITY_PARAM,Err)
-  CALL cmfe_Field_ComponentValuesInitialise(MaterialsFieldDarcy,CMFE_FIELD_U_VARIABLE_TYPE,CMFE_FIELD_VALUES_SET_TYPE, &
-       & MaterialsFieldUserNumberDarcyPermOverVis,PERM_OVER_VIS_PARAM,Err)
+  CALL OC_EquationsSet_MaterialsCreateFinish(equationsSetDarcy,err)
+  CALL OC_Field_ComponentValuesInitialise(materialsFieldDarcy,OC_FIELD_U_VARIABLE_TYPE,OC_FIELD_VALUES_SET_TYPE, &
+    & 1,porosityParameter,err)
+  CALL OC_Field_ComponentValuesInitialise(materialsFieldDarcy,OC_FIELD_U_VARIABLE_TYPE,OC_FIELD_VALUES_SET_TYPE, &
+    & 2,permOverVisParameter,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! ANALYTIC FIELD
   !-----------------------------------------------------------------------------------------------------------
 
   !Create the equations set analytic field variables for static Darcy
-  !CALL cmfe_Field_Initialise(AnalyticField,Err)
-  !CALL cmfe_EquationsSet_AnalyticCreateStart(EquationsSetDarcy,ANALYTICAL_TYPE,AnalyticFieldUserNumberDarcy,AnalyticField,Err)
+  !CALL OC_Field_Initialise(analyticField,err)
+  !CALL OC_EquationsSet_AnalyticCreateStart(equationsSetDarcy,analyticalType,ANALYTIC_FIELD_USER_NUMBER,analyticField,err)
   !Finish the equations set analytic field variables
-  !CALL cmfe_EquationsSet_AnalyticCreateFinish(EquationsSetDarcy,Err)
+  !CALL OC_EquationsSet_AnalyticCreateFinish(equationsSetDarcy,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! EQUATIONS
   !-----------------------------------------------------------------------------------------------------------
 
   !Create the equations set equations
-  CALL cmfe_Equations_Initialise(EquationsDarcy,Err)
-  CALL cmfe_EquationsSet_EquationsCreateStart(EquationsSetDarcy,EquationsDarcy,Err)
+  CALL OC_Equations_Initialise(equationsDarcy,err)
+  CALL OC_EquationsSet_EquationsCreateStart(equationsSetDarcy,equationsDarcy,err)
   !Set the equations matrices sparsity type
-  CALL cmfe_Equations_SparsityTypeSet(EquationsDarcy,CMFE_EQUATIONS_SPARSE_MATRICES,Err)
+  CALL OC_Equations_SparsityTypeSet(equationsDarcy,OC_EQUATIONS_SPARSE_MATRICES,err)
   !Set the equations set output
-  CALL cmfe_Equations_OutputTypeSet(EquationsDarcy,EQUATIONS_DARCY_OUTPUT,Err)
+  CALL OC_Equations_OutputTypeSet(equationsDarcy,equationsDarcyOutput,err)
   !Finish the equations set equations
-  CALL cmfe_EquationsSet_EquationsCreateFinish(EquationsSetDarcy,Err)
+  CALL OC_EquationsSet_EquationsCreateFinish(equationsSetDarcy,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! PROBLEM
   !-----------------------------------------------------------------------------------------------------------
 
   !Start the creation of a problem.
-  CALL cmfe_Problem_Initialise(Problem,Err)
-  CALL cmfe_ControlLoop_Initialise(ControlLoop,Err)
-  CALL cmfe_Problem_CreateStart(ProblemUserNumber,[CMFE_PROBLEM_FLUID_MECHANICS_CLASS,CMFE_PROBLEM_DARCY_EQUATION_TYPE, &
-       & CMFE_PROBLEM_STANDARD_DARCY_SUBTYPE],Problem,Err)
+  CALL OC_Problem_Initialise(problem,err)
+  CALL OC_ControlLoop_Initialise(controlLoop,err)
+  CALL OC_Problem_CreateStart(PROBLEM_USER_NUMBER,context,[OC_PROBLEM_FLUID_MECHANICS_CLASS,OC_PROBLEM_DARCY_EQUATION_TYPE, &
+    & OC_PROBLEM_STANDARD_DARCY_SUBTYPE],problem,err)
   !Finish the creation of a problem.
-  CALL cmfe_Problem_CreateFinish(Problem,Err)
+  CALL OC_Problem_CreateFinish(problem,err)
   !Start the creation of the problem control loop
-  CALL cmfe_Problem_ControlLoopCreateStart(Problem,Err)
+  CALL OC_Problem_ControlLoopCreateStart(problem,err)
   !Finish creating the problem control loop
-  CALL cmfe_Problem_ControlLoopCreateFinish(Problem,Err)
+  CALL OC_Problem_ControlLoopCreateFinish(problem,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! SOLVER
   !-----------------------------------------------------------------------------------------------------------
 
   !Start the creation of the problem solvers
-  CALL cmfe_Solver_Initialise(LinearSolverDarcy,Err)
-  CALL cmfe_Problem_SolversCreateStart(Problem,Err)
+  CALL OC_Solver_Initialise(linearSolverDarcy,err)
+  CALL OC_Problem_SolversCreateStart(problem,err)
   !Get the Darcy solver
-  CALL cmfe_Problem_SolverGet(Problem,CMFE_CONTROL_LOOP_NODE,SolverDarcyUserNumber,LinearSolverDarcy,Err)
+  CALL OC_Problem_SolverGet(problem,OC_CONTROL_LOOP_NODE,1,linearSolverDarcy,err)
   !Set the output type
-  CALL cmfe_Solver_OutputTypeSet(LinearSolverDarcy,LINEAR_SOLVER_DARCY_OUTPUT_TYPE,Err)
+  CALL OC_Solver_OutputTypeSet(linearSolverDarcy,linearSolverDarcyOutputType,err)
   !Set the solver settings
-  IF(LINEAR_SOLVER_DARCY_DIRECT_FLAG) THEN
-     CALL cmfe_Solver_LinearTypeSet(LinearSolverDarcy,CMFE_SOLVER_LINEAR_DIRECT_SOLVE_TYPE,Err)
-     CALL cmfe_Solver_LibraryTypeSet(LinearSolverDarcy,CMFE_SOLVER_MUMPS_LIBRARY,Err)
+  IF(linearSolverDarcyDirectFlag) THEN
+    CALL OC_Solver_LinearTypeSet(linearSolverDarcy,OC_SOLVER_LINEAR_DIRECT_SOLVE_TYPE,err)
+    CALL OC_Solver_LibraryTypeSet(linearSolverDarcy,OC_SOLVER_MUMPS_LIBRARY,err)
   ELSE
-     CALL cmfe_Solver_LinearTypeSet(LinearSolverDarcy,CMFE_SOLVER_LINEAR_ITERATIVE_SOLVE_TYPE,Err)
-     CALL cmfe_Solver_LinearIterativeMaximumIterationsSet(LinearSolverDarcy,MAXIMUM_ITERATIONS,Err)
-     CALL cmfe_Solver_LinearIterativeDivergenceToleranceSet(LinearSolverDarcy,DIVERGENCE_TOLERANCE,Err)
-     CALL cmfe_Solver_LinearIterativeRelativeToleranceSet(LinearSolverDarcy,RELATIVE_TOLERANCE,Err)
-     CALL cmfe_Solver_LinearIterativeAbsoluteToleranceSet(LinearSolverDarcy,ABSOLUTE_TOLERANCE,Err)
-     CALL cmfe_Solver_LinearIterativeGMRESRestartSet(LinearSolverDarcy,RESTART_VALUE,Err)
+    CALL OC_Solver_LinearTypeSet(linearSolverDarcy,OC_SOLVER_LINEAR_ITERATIVE_SOLVE_TYPE,err)
+    CALL OC_Solver_LinearIterativeMaximumIterationsSet(linearSolverDarcy,maximumIterations,err)
+    CALL OC_Solver_LinearIterativeDivergenceToleranceSet(linearSolverDarcy,divergenceTolerance,err)
+    CALL OC_Solver_LinearIterativeRelativeToleranceSet(linearSolverDarcy,relativeTolerance,err)
+    CALL OC_Solver_LinearIterativeAbsoluteToleranceSet(linearSolverDarcy,absoluteTolerance,err)
+    CALL OC_Solver_LinearIterativeGMRESRestartSet(linearSolverDarcy,restartValue,err)
   ENDIF
   !Finish the creation of the problem solver
-  CALL cmfe_Problem_SolversCreateFinish(Problem,Err)
+  CALL OC_Problem_SolversCreateFinish(problem,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! SOLVER EQUATIONS
   !-----------------------------------------------------------------------------------------------------------
 
   !Start the creation of the problem solver equations
-  CALL cmfe_Solver_Initialise(LinearSolverDarcy,Err)
-  CALL cmfe_SolverEquations_Initialise(SolverEquationsDarcy,Err)
+  CALL OC_Solver_Initialise(linearSolverDarcy,err)
+  CALL OC_SolverEquations_Initialise(solverEquationsDarcy,err)
 
-  CALL cmfe_Problem_SolverEquationsCreateStart(Problem,Err)
+  CALL OC_Problem_SolverEquationsCreateStart(problem,err)
   !Get the Darcy solver equations
-  CALL cmfe_Problem_SolverGet(Problem,CMFE_CONTROL_LOOP_NODE,SolverDarcyUserNumber,LinearSolverDarcy,Err)
-  CALL cmfe_Solver_SolverEquationsGet(LinearSolverDarcy,SolverEquationsDarcy,Err)
+  CALL OC_Problem_SolverGet(problem,OC_CONTROL_LOOP_NODE,1,linearSolverDarcy,err)
+  CALL OC_Solver_SolverEquationsGet(linearSolverDarcy,solverEquationsDarcy,err)
   !Set the solver equations sparsity
-  CALL cmfe_SolverEquations_SparsityTypeSet(SolverEquationsDarcy,CMFE_SOLVER_SPARSE_MATRICES,Err)
+  CALL OC_SolverEquations_SparsityTypeSet(solverEquationsDarcy,OC_SOLVER_SPARSE_MATRICES,err)
   !Add in the equations set
-  CALL cmfe_SolverEquations_EquationsSetAdd(SolverEquationsDarcy,EquationsSetDarcy,EquationsSetIndex,Err)
+  CALL OC_SolverEquations_EquationsSetAdd(solverEquationsDarcy,equationsSetDarcy,equationsSetIndex,err)
   !Finish the creation of the problem solver equations
-  CALL cmfe_Problem_SolverEquationsCreateFinish(Problem,Err)
+  CALL OC_Problem_SolverEquationsCreateFinish(problem,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! BOUNDARY CONDITIONS
   !-----------------------------------------------------------------------------------------------------------
 
   !Start the creation of the equations set boundary conditions for Darcy
-  CALL cmfe_BoundaryConditions_Initialise(BoundaryConditionsDarcy,Err)
-  CALL cmfe_SolverEquations_BoundaryConditionsCreateStart(SolverEquationsDarcy,BoundaryConditionsDarcy,Err)
+  CALL OC_BoundaryConditions_Initialise(boundaryConditionsDarcy,err)
+  CALL OC_SolverEquations_BoundaryConditionsCreateStart(solverEquationsDarcy,boundaryConditionsDarcy,err)
   !Set fixed wall nodes
-  IF(FIXED_WALL_NODES_FLAG) THEN
-     DO NODE_COUNTER=1,NUMBER_OF_FIXED_WALL_NODES
-        NODE_NUMBER=FIXED_WALL_NODES(NODE_COUNTER)
-        CONDITION=CMFE_BOUNDARY_CONDITION_FIXED
-        CALL cmfe_Decomposition_NodeDomainGet(Decomposition,NODE_NUMBER,1,BoundaryNodeDomain,Err)
-        IF(BoundaryNodeDomain==ComputationalNodeNumber) THEN
-           DO COMPONENT_NUMBER=1,NUMBER_OF_DIMENSIONS
-              VALUE=0.0_CMISSRP
-              CALL cmfe_BoundaryConditions_SetNode(BoundaryConditionsDarcy,DependentFieldDarcy,CMFE_FIELD_U_VARIABLE_TYPE,1, &
-                   & CMFE_NO_GLOBAL_DERIV,NODE_NUMBER,COMPONENT_NUMBER,CONDITION,VALUE,Err)
-           ENDDO
-        ENDIF
-     ENDDO
+  IF(fixedWallNodesFlag) THEN
+    DO nodeIdx=1,numberOfFixedWallNodes
+      nodeNumber=fixedWallNodes(nodeIdx)
+      condition=OC_BOUNDARY_CONDITION_FIXED
+      CALL OC_Decomposition_NodeDomainGet(decomposition,1,nodeNumber,boundaryNodeDomain,err)
+      IF(boundaryNodeDomain==computationalNodeNumber) THEN
+        DO componentIdx=1,numberOfDimensions
+          boundaryConditionValue=0.0_OC_RP
+          CALL OC_BoundaryConditions_SetNode(boundaryConditionsDarcy,dependentFieldDarcy,OC_FIELD_U_VARIABLE_TYPE,1, &
+            & OC_NO_GLOBAL_DERIV,nodeNumber,componentIdx,condition,boundaryConditionValue,err)
+        ENDDO
+      ENDIF
+    ENDDO
   ENDIF
   !Set velocity boundary conditions
-  IF(INLET_WALL_NODES_FLAG) THEN
-     DO NODE_COUNTER=1,NUMBER_OF_INLET_WALL_NODES
-        NODE_NUMBER=INLET_WALL_NODES(NODE_COUNTER)
-        CONDITION=CMFE_BOUNDARY_CONDITION_FIXED
-        CALL cmfe_Decomposition_NodeDomainGet(Decomposition,NODE_NUMBER,1,BoundaryNodeDomain,Err)
-        IF(BoundaryNodeDomain==ComputationalNodeNumber) THEN
-           DO COMPONENT_NUMBER=1,NUMBER_OF_DIMENSIONS
-              VALUE=BOUNDARY_CONDITIONS(COMPONENT_NUMBER)
-              CALL cmfe_BoundaryConditions_SetNode(BoundaryConditionsDarcy,DependentFieldDarcy,CMFE_FIELD_U_VARIABLE_TYPE,1, &
-                   & CMFE_NO_GLOBAL_DERIV,NODE_NUMBER,COMPONENT_NUMBER,CONDITION,VALUE,Err)
-           ENDDO
-        ENDIF
-     ENDDO
+  IF(inletWallNodesFlag) THEN
+    DO nodeIdx=1,numberOfInletWallNodes
+      nodeNumber=inletWallNodes(nodeIdx)
+      condition=OC_BOUNDARY_CONDITION_FIXED
+      CALL OC_Decomposition_NodeDomainGet(decomposition,1,nodeNumber,boundaryNodeDomain,err)
+      IF(boundaryNodeDomain==computationalNodeNumber) THEN
+        DO componentIdx=1,numberOfDimensions
+          boundaryConditionValue=boundaryConditionValues(componentIdx)
+          CALL OC_BoundaryConditions_SetNode(boundaryConditionsDarcy,dependentFieldDarcy,OC_FIELD_U_VARIABLE_TYPE,1, &
+            & OC_NO_GLOBAL_DERIV,nodeNumber,componentIdx,condition,boundaryConditionValue,err)
+        ENDDO
+      ENDIF
+    ENDDO
   ENDIF
-  !CALL cmfe_SolverEquations_BoundaryConditionsAnalytic(SolverEquationsDarcy,Err)
+  !CALL OC_SolverEquations_BoundaryConditionsAnalytic(solverEquationsDarcy,err)
   !Finish the creation of the equations set boundary conditions
-  CALL cmfe_SolverEquations_BoundaryConditionsCreateFinish(SolverEquationsDarcy,Err)
+  CALL OC_SolverEquations_BoundaryConditionsCreateFinish(solverEquationsDarcy,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! SOLVE
   !-----------------------------------------------------------------------------------------------------------
 
+  INQUIRE(file="./results", exist=directoryExists)
+  IF(.NOT.directoryExists) CALL EXECUTE_COMMAND_LINE("mkdir ./output")
+  
   !Solve the problem
   WRITE(*,'(A)') "Solving problem..."
-  CALL cmfe_Problem_Solve(Problem,Err)
+  CALL OC_Problem_Solve(problem,err)
   WRITE(*,'(A)') "Problem solved!"
 
   !-----------------------------------------------------------------------------------------------------------
@@ -494,21 +475,24 @@ PROGRAM darcy_static
   !-----------------------------------------------------------------------------------------------------------
 
   !Output Analytic Analysis
-  !CALL cmfe_AnalyticAnalysis_Output(DependentFieldDarcy,"DarcyAnalytic",Err)
+  !CALL OC_AnalyticAnalysis_Output(dependentFieldDarcy,"DarcyAnalytic",err)
 
-  EXPORT_FIELD_IO=.FALSE.
-  IF(EXPORT_FIELD_IO) THEN
+  exportFieldIO=.FALSE.
+  IF(exportFieldIO) THEN
      WRITE(*,'(A)') "Exporting fields..."
-     CALL cmfe_Fields_Initialise(Fields,Err)
-     CALL cmfe_Fields_Create(Region,Fields,Err)
-     CALL cmfe_Fields_NodesExport(Fields,"darcy_static","FORTRAN",Err)
-     CALL cmfe_Fields_ElementsExport(Fields,"darcy_static","FORTRAN",Err)
-     CALL cmfe_Fields_Finalise(Fields,Err)
+     CALL OC_Fields_Initialise(fields,err)
+     CALL OC_Fields_Create(region,fields,err)
+     CALL OC_Fields_NodesExport(fields,"darcy_static","FORTRAN",err)
+     CALL OC_Fields_ElementsExport(fields,"darcy_static","FORTRAN",err)
+     CALL OC_Fields_Finalise(fields,err)
      WRITE(*,'(A)') "Field exported!"
   ENDIF
 
-  !Finialise CMISS
-  CALL cmfe_Finalise(Err)
+  !Destroy the context
+  CALL OC_Context_Destroy(context,err)
+  !Finialise OpenCMISS
+  CALL OC_Finalise(err)
+  
   WRITE(*,'(A)') "Program successfully completed."
 
-END PROGRAM darcy_static
+END PROGRAM DarcyStaticExample
